@@ -1,0 +1,25 @@
+services:
+  dobrika-search:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: dobrika-search:latest
+    container_name: dobrika-search-server
+    ports:
+      - "8080:8080"
+    volumes:
+      # Persist Xapian database
+      - ./db:/app/db
+      # Persist uploads if any
+      - ./uploads:/app/uploads
+    environment:
+      - LOG_LEVEL=INFO
+    restart: unless-stopped
+    networks:
+      - dobrika-network
+    user: "1000:1000"
+
+networks:
+  dobrika-network:
+    driver: bridge
+

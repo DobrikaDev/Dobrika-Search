@@ -1,0 +1,52 @@
+# Build artifacts
+build/
+cmake-build-*/
+out/
+
+# Git
+.git/
+.gitignore
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Documentation
+README.md
+*.md
+
+# Docker files
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Databases (will be mounted as volumes)
+db/
+uploads/
+
+# Python dev tools
+dev/
+__pycache__/
+*.pyc
+venv/
+env/
+
+# Logs
+*.log
+
+# CMake generated
+CMakeCache.txt
+CMakeFiles/
+Makefile
+*.cmake
+
+# Compiled files
+*.o
+*.so
+*.a
+*.pb.cc
+*.pb.h
+

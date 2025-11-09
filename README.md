@@ -87,13 +87,7 @@ curl -sS -X POST http://127.0.0.1:8088/index \
 ```
 - Search:
 ```bash
-curl -sS -X POST http://127.0.0.1:8088/search \
-  -H 'Content-Type: application/json' \
-  -d '{
-    "user_query": "demo",
-    "geo_data": "55.75,37.61",
-    "query_type": "QT_GeoTasks"
-  }'
+d
 ```
 
 ## Python load test
@@ -158,10 +152,105 @@ ctest --test-dir build -R dse_http_tests --output-on-failure
   cmake --build build -j
   ```
 
+## Docker
+
+### Quick Start
+Build and run the server in Docker:
+
+```bash
+# Build the image
+docker compose build
+
+# Start the server (background)
+docker compose up -d
+
+# View logs
+docker compose logs -f
+
+# Stop the server
+docker compose down
+```
+
+### Using the Helper Script
+A convenience script is provided:
+
+```bash
+# Build
+./docker-run.sh build
+
+# Start
+./docker-run.sh up
+
+# View logs
+./docker-run.sh logs
+
+# Open shell in container
+./docker-run.sh shell
+
+# Stop
+./docker-run.sh down
+
+# Clean up (remove containers, images, volumes)
+./docker-run.sh clean
+
+# Check status
+./docker-run.sh status
+```
+
+### Configuration
+The Docker setup:
+- **Image**: Multi-stage build (optimized ~200MB runtime)
+- **Port**: `8080` (maps to `8088` inside container)
+- **Volumes**:
+  - `./db` — persists Xapian database
+  - `./uploads` — temporary upload storage
+- **User**: Non-root user (`dobrika:1000:1000`) for security
+
+### HTTP API Access
+Once running, the API is available at `http://localhost:8080`:
+
+```bash
+# Health check
+curl http://localhost:8080/healthz
+
+# Index a task
+curl -X POST http://localhost:8080/index \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "task_name": "demo",
+    "task_desc": "simple doc",
+    "geo_data": "55.75,37.61",
+    "task_id": "task-1",
+    "task_type": "default"
+  }'
+
+# Search
+curl -X POST http://localhost:8080/search \
+  -H 'Content-Type: application/json' \
+  -d '{"query": "simple"}'
+```
+
+### Troubleshooting
+- **Permission denied on socket**: Run with `sudo` or add user to docker group:
+  ```bash
+  sudo usermod -aG docker $USER
+  newgrp docker
+  ```
+- **Port already in use**:
+  ```bash
+  sudo lsof -i :8080
+  sudo kill -9 <PID>
+  ```
+- **Permission errors on uploads**: Ensure correct ownership:
+  ```bash
+  sudo chown -R 1000:1000 ./db ./uploads
+  sudo chmod -R 755 ./db ./uploads
+  ```
+
 ## Project structure
-- `src/Components/xapian_processor` — Xapian слой
+- `src/xapian_processor` — Xapian слой
 - `src/server` — HTTP сервер (Drogon)
-- `src/Proto` — protobuf-модели
+- `src/proto` — protobuf-модели
 - `tests` — тесты (Catch2)
 - `dev` — помощники для разработки (load test, JSON-данные)
 
