@@ -1,0 +1,11 @@
+version: v1
+lint:
+  use:
+    - DEFAULT
+breaking:
+  use:
+    - FILE
+build:
+  roots:
+    - src/Proto
+

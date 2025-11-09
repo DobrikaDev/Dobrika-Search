@@ -1,0 +1,14 @@
+syntax = "proto3";
+
+message SearchConfig {
+    string db_file_name = 1;
+    int32 cold_backup_timer_min = 2;
+    int32 hot_backup_timer_min = 3;
+    int32 search_offset = 4;
+    int32 search_limit = 5;
+    int32 search_geo_index = 6;
+}
+
+message DobrikaServerConfig {
+    SearchConfig sc = 1;
+}
