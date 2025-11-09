@@ -68,26 +68,105 @@ DOBRIKA_ADDR=0.0.0.0 DOBRIKA_PORT=8090 DOBRIKA_DB_PATH=/tmp/dse-db \
   ./build/dobrika_server_main
 ```
 
-## HTTP quick test (curl)
+## API Documentation
+
+### Endpoints Overview
+- `GET /healthz` — Health check
+- `POST /index` — Index a new task
+- `POST /search` — Search for tasks
+
+### Request/Response Models
+
+#### Index Task (`POST /index`)
+
+**Request:**
+```json
+{
+  "task_name": "string",      // Task name (indexed)
+  "task_desc": "string",      // Task description (indexed)
+  "task_id": "string",        // Unique task identifier (required)
+  "geo_data": "lat,lon",      // Geo coordinates as "latitude,longitude"
+  "task_type": "string"       // Task type: "TT_OnlineTask" or "TT_OfflineTask"
+}
+```
+
+**Response:**
+```json
+{
+  "status": "string"          // Status: "SearchIndexOk" or "SearchIndexFall"
+}
+```
+
+**Example:**
+```bash
+curl -X POST http://127.0.0.1:8088/index \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "task_name": "Web development",
+    "task_desc": "Need help building a React app",
+    "geo_data": "55.75,37.61",
+    "task_id": "task-123",
+    "task_type": "TT_OnlineTask"
+  }'
+```
+
+#### Search Tasks (`POST /search`)
+
+**Request:**
+```json
+{
+  "user_query": "string",           // Search query (text search in name/desc)
+  "query_type": "string",           // Query type (optional):
+                                    //   "QT_GeoTasks" - search with geo filter
+                                    //   "QT_OnlineTasks" - online tasks only
+                                    //   "QT_RandomTasks" - random results
+  "geo_data": "lat,lon",            // Geo coordinates for QT_GeoTasks
+  "user_tags": ["tag1", "tag2"]     // Tags for filtering (optional)
+}
+```
+
+**Response:**
+```json
+{
+  "task_id": ["id1", "id2", ...],   // Array of matching task IDs
+  "status": "string"                // Status: "SearchOk", "SearchUnknownType", etc.
+}
+```
+
+**Example 1: Text search**
+```bash
+curl -X POST http://127.0.0.1:8088/search \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "user_query": "React development",
+    "query_type": "QT_OnlineTasks"
+  }'
+```
+
+**Example 2: Geo-based search**
+```bash
+curl -X POST http://127.0.0.1:8088/search \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "user_query": "python",
+    "query_type": "QT_GeoTasks",
+    "geo_data": "55.75,37.61"
+  }'
+```
+
+### Status Codes
+- `SearchOk` — Search completed successfully
+- `SearchIndexOk` — Task indexed successfully
+- `SearchIndexFall` — Indexing failed
+- `SearchHealthOk` — Server is healthy
+- `SearchUnknownType` — Unknown query/task type
+- `SearchNotImplemented` — Feature not implemented
+- `SearchInvalidJson` — Invalid JSON in request
+
+### HTTP quick test (curl)
 - Health:
 ```bash
 curl -sS http://127.0.0.1:8088/healthz
-```
-- Index task:
-```bash
-curl -sS -X POST http://127.0.0.1:8088/index \
-  -H 'Content-Type: application/json' \
-  -d '{
-    "task_name": "demo",
-    "task_desc": "simple doc",
-    "geo_data": "55.75,37.61",
-    "task_id": "task-1",
-    "task_type": "default"
-  }'
-```
-- Search:
-```bash
-d
 ```
 
 ## Python load test
