@@ -1,10 +1,5 @@
 syntax = "proto3";
 
-message DSItem {
-    string ProcessedQuery = 1;
-    string GeoData = 2;
-    repeated string UserTags = 3;
-}
 
 message DSearchResult {
     repeated string task_id = 1;

@@ -27,7 +27,8 @@ sudo apt update
 sudo apt install -y build-essential cmake pkg-config \
   libprotobuf-dev protobuf-compiler \
   libxapian-dev \
-  libdrogon-dev
+  libdrogon-dev \
+  libjsoncpp-dev
 ```
 
 If your distro provides Drogon via CMake config (`DrogonConfig.cmake`) it will be auto-detected. If not, the build will try a pkg-config fallback and then a manual header/lib search.
@@ -91,7 +92,7 @@ curl -sS -X POST http://127.0.0.1:8088/search \
   -d '{
     "user_query": "demo",
     "geo_data": "55.75,37.61",
-    "query_type": "default"
+    "query_type": "QT_GeoTasks"
   }'
 ```
 

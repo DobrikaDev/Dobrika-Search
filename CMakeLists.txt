@@ -31,7 +31,7 @@ protobuf_generate_cpp(PROTO_SRCS PROTO_HDRS ${PROTO_FILES})
 
 # Library with search layer
 set(SRC_FILES
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/Components/xapian_processor/xapian_processor.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/xapian_processor/xapian_processor.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/tools/dse_tools.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/tools/config_generator.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/static.cpp
@@ -139,6 +139,10 @@ if (DOBRIKA_WITH_SERVER)
   endif()
   if (HAVE_DROGON)
     message(STATUS "Drogon found: enabling web server and HTTP tests")
+    
+    # Ensure jsoncpp is available for Drogon's headers
+    pkg_check_modules(JSONCPP REQUIRED jsoncpp)
+    
     add_library(dobrika_server STATIC
         ${CMAKE_CURRENT_SOURCE_DIR}/src/server/web_server.cpp
     )
@@ -146,11 +150,13 @@ if (DOBRIKA_WITH_SERVER)
         PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/src
         ${CMAKE_CURRENT_BINARY_DIR}
+        ${JSONCPP_INCLUDE_DIRS}
     )
     target_link_libraries(dobrika_server
         PRIVATE
         dobrika_search
         Drogon::Drogon
+        ${JSONCPP_LIBRARIES}
     )
     target_compile_options(dobrika_server PRIVATE -Wall -Wextra -Wpedantic)
 
@@ -194,10 +200,15 @@ if (DOBRIKA_WITH_SERVER AND HAVE_DROGON)
     add_executable(dse_http_tests
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_http_server.cpp
     )
+    target_include_directories(dse_http_tests
+        PRIVATE
+        ${JSONCPP_INCLUDE_DIRS}
+    )
     target_link_libraries(dse_http_tests
         PRIVATE
         dobrika_server
         Catch2::Catch2WithMain
+        ${JSONCPP_LIBRARIES}
     )
     add_test(NAME dse_http_tests COMMAND dse_http_tests)
 endif()

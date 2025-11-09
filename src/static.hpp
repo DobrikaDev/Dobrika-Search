@@ -1,5 +1,6 @@
 #pragma once
 #include "DSRequest.pb.h"
+#include <cmath>
 #include <map>
 #include <string>
 
@@ -33,11 +34,24 @@ inline DSTaskTypeEnum GetTaskFromRequest(const DSIndexTask &request) {
 
 /*Search Status*/
 
-enum DSearchStatus { DSOk, DSUnknownTaskType, DSNotImplemented };
+enum DSearchStatus {
+  DSOk,
+  DSUnknownTaskType,
+  DSNotImplemented,
+  DSHealthOk,
+  DSIndexOk,
+  DSIndexFall,
+  DSInvalidJson
+};
 inline const std::map<DSearchStatus, std::string> kStatusToString = {
     {DSearchStatus::DSOk, "SearchOk"},
     {DSearchStatus::DSUnknownTaskType, "SearchUnknownType"},
-    {DSearchStatus::DSNotImplemented, "DSNotImplemented"}};
+    {DSearchStatus::DSNotImplemented, "SearchNotImplemented"},
+    {DSearchStatus::DSHealthOk, "SearchHealthOk"},
+    {DSearchStatus::DSIndexOk, "SearchIndexOk"},
+    {DSearchStatus::DSIndexFall, "SearchIndexFall"},
+    {DSearchStatus::DSInvalidJson, "SearchInvalidJson"},
+};
 
 inline std::string GetSearchStatus(DSearchStatus status) {
   const auto it = kStatusToString.find(status);

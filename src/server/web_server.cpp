@@ -1,6 +1,7 @@
 #include "server/web_server.hpp"
-#include "Components/xapian_processor/xapian_processor.hpp"
+#include "static.hpp"
 #include "DServer.pb.h"
+#include "xapian_processor/xapian_processor.hpp"
 #include <atomic>
 #include <chrono>
 #include <drogon/drogon.h>
@@ -12,7 +13,7 @@ namespace {
 std::shared_ptr<XapianLayer> g_layer;
 std::atomic<bool> g_running{false};
 
-DSIndexTask makeTaskFromJson(const Json::Value &json) {
+DSIndexTask MakeTaskFromJson(const Json::Value &json) {
   DSIndexTask task;
   if (json.isMember("task_name"))
     task.set_task_name(json["task_name"].asString());
@@ -27,7 +28,7 @@ DSIndexTask makeTaskFromJson(const Json::Value &json) {
   return task;
 }
 
-DSearchRequest makeSearchFromJson(const Json::Value &json) {
+DSearchRequest MakeSearchFromJson(const Json::Value &json) {
   DSearchRequest req;
   if (json.isMember("user_query"))
     req.set_user_query(json["user_query"].asString());
@@ -43,7 +44,7 @@ DSearchRequest makeSearchFromJson(const Json::Value &json) {
   return req;
 }
 
-Json::Value toJson(const DSearchResult &res) {
+Json::Value ToJson(const DSearchResult &res) {
   Json::Value j;
   j["status"] = res.status();
   Json::Value ids(Json::arrayValue);
@@ -59,7 +60,6 @@ void start_server_blocking(const DobrikaServerConfig &cfg,
                            const std::string &address, uint16_t port) {
   g_layer = std::make_shared<XapianLayer>(cfg);
 
-  // Health check
   app().registerHandler(
       "/healthz",
       [](const HttpRequestPtr &,
@@ -67,12 +67,11 @@ void start_server_blocking(const DobrikaServerConfig &cfg,
         auto resp = HttpResponse::newHttpResponse();
         resp->setStatusCode(k200OK);
         resp->setContentTypeCode(CT_TEXT_PLAIN);
-        resp->setBody("ok");
+        resp->setBody(GetSearchStatus(DSearchStatus::DSHealthOk));
         callback(resp);
       },
       {Get});
 
-  // Index task
   app().registerHandler(
       "/index",
       [](const HttpRequestPtr &req,
@@ -80,24 +79,25 @@ void start_server_blocking(const DobrikaServerConfig &cfg,
         auto json = req->getJsonObject();
         if (!json) {
           Json::Value v;
-          v["error"] = "invalid json";
+          v["error"] = GetSearchStatus(DSearchStatus::DSInvalidJson);
           auto resp = HttpResponse::newHttpJsonResponse(v);
           resp->setStatusCode(k400BadRequest);
           callback(resp);
           return;
         }
-        DSIndexTask task = makeTaskFromJson(*json);
+        DSIndexTask task = MakeTaskFromJson(*json);
         try {
           g_layer->AddTaskToDB(task);
           Json::Value v;
           v["ok"] = true;
+          v["status"] = GetSearchStatus(DSearchStatus::DSIndexOk);
           auto resp = HttpResponse::newHttpJsonResponse(v);
           resp->setStatusCode(k200OK);
           callback(resp);
         } catch (...) {
           Json::Value v;
           v["ok"] = false;
-          v["error"] = "index failed";
+          v["status"] = GetSearchStatus(DSearchStatus::DSIndexOk);
           auto resp = HttpResponse::newHttpJsonResponse(v);
           resp->setStatusCode(k500InternalServerError);
           callback(resp);
@@ -113,15 +113,15 @@ void start_server_blocking(const DobrikaServerConfig &cfg,
         auto json = req->getJsonObject();
         if (!json) {
           Json::Value v;
-          v["error"] = "invalid json";
+          v["error"] = GetSearchStatus(DSearchStatus::DSInvalidJson);
           auto resp = HttpResponse::newHttpJsonResponse(v);
           resp->setStatusCode(k400BadRequest);
           callback(resp);
           return;
         }
-        DSearchRequest sreq = makeSearchFromJson(*json);
+        DSearchRequest sreq = MakeSearchFromJson(*json);
         DSearchResult sres = g_layer->DoSearch(sreq);
-        auto resp = HttpResponse::newHttpJsonResponse(toJson(sres));
+        auto resp = HttpResponse::newHttpJsonResponse(ToJson(sres));
         resp->setStatusCode(k200OK);
         callback(resp);
       },

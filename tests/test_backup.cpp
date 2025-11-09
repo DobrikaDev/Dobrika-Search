@@ -3,7 +3,7 @@
 #include <catch2/catch_test_macros.hpp>
 #include <filesystem>
 
-#include "Components/xapian_processor/xapian_processor.hpp"
+#include "xapian_processor/xapian_processor.hpp"
 #include "DSRequest.pb.h"
 #include "DSResponse.pb.h"
 #include "DServer.pb.h"

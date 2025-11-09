@@ -9,7 +9,7 @@
 #include "DSResponse.pb.h"
 #include "DServer.pb.h"
 
-#include "Components/xapian_processor/xapian_processor.hpp"
+#include "xapian_processor/xapian_processor.hpp"
 #include "tools/config_generator.hpp"
 
 namespace fs = std::filesystem;
