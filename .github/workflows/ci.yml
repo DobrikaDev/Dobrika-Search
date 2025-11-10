@@ -6,6 +6,10 @@ on:
       - main
   pull_request:
 
+permissions:
+  contents: read
+  packages: write
+
 concurrency:
   group: ci-${{ github.event.pull_request.number || github.sha }}
   cancel-in-progress: true
@@ -44,16 +48,12 @@ jobs:
     runs-on: ubuntu-latest
     needs: build-test
     env:
-      PUSH_IMAGE: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+      REGISTRY: ghcr.io
+      IMAGE_NAME: ghcr.io/dobrikadev/dobrika-search
+      PUSH_IMAGE: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && secrets.GHCR_TOKEN != '' && secrets.GHCR_USERNAME != '' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Prepare image metadata
-        id: meta
-        run: |
-          owner="${GITHUB_REPOSITORY_OWNER,,}"
-          echo "image=ghcr.io/${owner}/dobrika-search" >> "$GITHUB_OUTPUT"
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -65,9 +65,9 @@ jobs:
         if: env.PUSH_IMAGE == 'true'
         uses: docker/login-action@v3
         with:
-          registry: ghcr.io
-          username: ${{ github.repository_owner }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          registry: ${{ env.REGISTRY }}
+          username: ${{ secrets.GHCR_USERNAME }}
+          password: ${{ secrets.GHCR_TOKEN }}
 
       - name: Build container image
         uses: docker/build-push-action@v5
@@ -76,6 +76,6 @@ jobs:
           file: Dockerfile
           push: ${{ env.PUSH_IMAGE == 'true' }}
           tags: |
-            ${{ steps.meta.outputs.image }}:latest
-            ${{ steps.meta.outputs.image }}:${{ github.sha }}
+            ${{ env.IMAGE_NAME }}:latest
+            ${{ env.IMAGE_NAME }}:${{ github.sha }}
 
