@@ -97,7 +97,7 @@ void start_server_blocking(const DobrikaServerConfig &cfg,
         } catch (...) {
           Json::Value v;
           v["ok"] = true;
-          v["status"] = GetSearchStatus(DSearchStatus::DSIndexOk);
+          v["status"] = GetSearchStatus(DSearchStatus::DSIndexFall);
           auto resp = HttpResponse::newHttpJsonResponse(v);
           resp->setStatusCode(k500InternalServerError);
           callback(resp);
