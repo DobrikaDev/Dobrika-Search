@@ -13,7 +13,14 @@ services:
       # Persist uploads if any
       - ./uploads:/app/uploads
     environment:
-      - LOG_LEVEL=INFO
+      - DOBRIKA_ADDR=0.0.0.0
+      - DOBRIKA_PORT=8080
+      - DOBRIKA_DB_PATH=/app/db
+      - DOBRIKA_COLD_MIN=30
+      - DOBRIKA_HOT_MIN=15
+      - DOBRIKA_SEARCH_OFFSET=0
+      - DOBRIKA_SEARCH_LIMIT=20
+      - DOBRIKA_GEO_INDEX=2
     restart: unless-stopped
     networks:
       - dobrika-network

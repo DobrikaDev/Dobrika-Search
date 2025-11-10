@@ -92,6 +92,15 @@ COPY --from=builder --chown=dobrika:dobrika /build/build/dobrika_server_main /ap
 
 USER dobrika
 
+ENV DOBRIKA_ADDR=0.0.0.0 \
+    DOBRIKA_PORT=8080 \
+    DOBRIKA_DB_PATH=/app/db \
+    DOBRIKA_COLD_MIN=30 \
+    DOBRIKA_HOT_MIN=15 \
+    DOBRIKA_SEARCH_OFFSET=0 \
+    DOBRIKA_SEARCH_LIMIT=20 \
+    DOBRIKA_GEO_INDEX=2
+
 # Expose default port
 EXPOSE 8080
 

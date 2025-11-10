@@ -233,6 +233,19 @@ ctest --test-dir build -R dse_http_tests --output-on-failure
 
 ## Docker
 
+### Prebuilt Image
+
+Pushes from `main` publish a container image to GitHub Container Registry:
+
+- Image: `ghcr.io/slipneff/dobrika-search:latest`
+- Digest-tagged images are also available per commit SHA.
+
+You can pull it directly:
+
+```bash
+docker pull ghcr.io/slipneff/dobrika-search:latest
+```
+
 ### Quick Start
 Build and run the server in Docker:
 
@@ -279,11 +292,16 @@ A convenience script is provided:
 ### Configuration
 The Docker setup:
 - **Image**: Multi-stage build (optimized ~200MB runtime)
-- **Port**: `8080` (maps to `8088` inside container)
+- **Port**: `8080` (container runs with `DOBRIKA_PORT=8080`)
 - **Volumes**:
   - `./db` — persists Xapian database
   - `./uploads` — temporary upload storage
 - **User**: Non-root user (`dobrika:1000:1000`) for security
+- **Environment**:
+  - `DOBRIKA_ADDR=0.0.0.0`
+  - `DOBRIKA_PORT=8080`
+  - `DOBRIKA_DB_PATH=/app/db`
+  - Search tuning knobs (`DOBRIKA_COLD_MIN`, `DOBRIKA_HOT_MIN`, `DOBRIKA_SEARCH_OFFSET`, `DOBRIKA_SEARCH_LIMIT`, `DOBRIKA_GEO_INDEX`)
 
 ### HTTP API Access
 Once running, the API is available at `http://localhost:8080`:
@@ -325,6 +343,34 @@ curl -X POST http://localhost:8080/search \
   sudo chown -R 1000:1000 ./db ./uploads
   sudo chmod -R 755 ./db ./uploads
   ```
+
+## Kubernetes Deployment
+
+Manifests under `deployments/k8s/` provision the service in a cluster. Apply them as-is for a single-replica demo deployment:
+
+```bash
+kubectl apply -f deployments/k8s/configmap.yaml
+kubectl apply -f deployments/k8s/deployment.yaml
+kubectl apply -f deployments/k8s/service.yaml
+```
+
+Key details:
+- Uses the GHCR image `ghcr.io/slipneff/dobrika-search:latest`.
+- Environment variables are sourced from the `search-engine-config` ConfigMap.
+- Pod security context runs the container as UID/GID 1000 to match the image.
+- An `emptyDir` volume backs `/app/db`; replace with a PVC for persistent storage.
+- HTTP health probes hit `/healthz` on port 8080.
+
+Customize the ConfigMap values or replica counts as needed before applying in production.
+
+## CI/CD
+
+GitHub Actions workflow `.github/workflows/ci.yml` runs on every push and pull request. It:
+- Installs C++ dependencies, configures CMake, builds the server, and runs unit tests.
+- Builds the Docker image with BuildKit.
+- Pushes `ghcr.io/<owner>/dobrika-search` tags (`latest` and commit SHA) whenever the `main` branch succeeds; pull requests build without pushing.
+
+Set additional secrets (for example `GHCR_PAT`) if you prefer pushing to another registry.
 
 ## Project structure
 - `src/xapian_processor` — Xapian слой
