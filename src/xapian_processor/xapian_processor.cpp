@@ -25,7 +25,6 @@ XapianLayer::XapianLayer(const DobrikaServerConfig &config) {
     database = Xapian::Database(SearchConfigProto.db_file_name());
   }
 }
-
 XapianLayer::~XapianLayer() { StopBackupScheduler(); }
 
 std::unique_ptr<Xapian::LatLongDistanceKeyMaker>

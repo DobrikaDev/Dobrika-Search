@@ -92,20 +92,21 @@ COPY --from=builder --chown=dobrika:dobrika /build/build/dobrika_server_main /ap
 USER dobrika
 
 ENV DOBRIKA_ADDR=0.0.0.0 \
-    DOBRIKA_PORT=8080 \
+    DOBRIKA_PORT=8088 \
     DOBRIKA_DB_PATH=/app/db \
     DOBRIKA_COLD_MIN=30 \
     DOBRIKA_HOT_MIN=15 \
     DOBRIKA_SEARCH_OFFSET=0 \
-    DOBRIKA_SEARCH_LIMIT=20 \
-    DOBRIKA_GEO_INDEX=2
+    DOBRIKA_SEARCH_LIMIT=5 \
+    DOBRIKA_GEO_INDEX=9 \
+    DOBRIKA_LOG_REQUESTS=1
 
 # Expose default port
 EXPOSE 8080
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD wget --no-verbose --tries=1 --spider http://localhost:8080/healthz || exit 1
+    CMD wget --no-verbose --tries=1 --spider http://localhost:8088/healthz || exit 1
 
 # Run the server
 CMD ["./dobrika_server_main"]

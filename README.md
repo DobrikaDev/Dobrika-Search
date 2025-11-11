@@ -294,14 +294,17 @@ The Docker setup:
 - **Image**: Multi-stage build (optimized ~200MB runtime)
 - **Port**: `8080` (container runs with `DOBRIKA_PORT=8080`)
 - **Volumes**:
-  - `./db` — persists Xapian database
+  - `dobrika-db` — named volume that persists the Xapian database
   - `./uploads` — temporary upload storage
 - **User**: Non-root user (`dobrika:1000:1000`) for security
 - **Environment**:
   - `DOBRIKA_ADDR=0.0.0.0`
   - `DOBRIKA_PORT=8080`
   - `DOBRIKA_DB_PATH=/app/db`
+  - `DOBRIKA_LOG_REQUESTS=0` — set to `1/true/on` to log every HTTP request with body (useful for tests)
   - Search tuning knobs (`DOBRIKA_COLD_MIN`, `DOBRIKA_HOT_MIN`, `DOBRIKA_SEARCH_OFFSET`, `DOBRIKA_SEARCH_LIMIT`, `DOBRIKA_GEO_INDEX`)
+
+To mount a host directory instead of the named volume (for debugging/backups), replace the `dobrika-db:/app/db` entry in `docker-compose.yml` with `./db:/app/db` and make sure the host folder exists and is owned by UID/GID `1000:1000`.
 
 ### HTTP API Access
 Once running, the API is available at `http://localhost:8080`:
@@ -338,7 +341,7 @@ curl -X POST http://localhost:8080/search \
   sudo lsof -i :8080
   sudo kill -9 <PID>
   ```
-- **Permission errors on uploads**: Ensure correct ownership:
+- **Permission errors on uploads or custom bind mounts**: Ensure the host directory is writable by UID/GID `1000:1000`:
   ```bash
   sudo chown -R 1000:1000 ./db ./uploads
   sudo chmod -R 755 ./db ./uploads
