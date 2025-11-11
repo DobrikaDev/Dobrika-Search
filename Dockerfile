@@ -41,7 +41,6 @@ WORKDIR /build
 # Copy source files
 COPY CMakeLists.txt buf.yaml ./
 COPY src/ ./src/
-COPY tests/ ./tests/
 
 # Build the project
 RUN mkdir -p build && \
