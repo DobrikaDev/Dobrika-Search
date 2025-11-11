@@ -26,6 +26,7 @@ public:
   DSearchResult DoSearch(const DSearchRequest &user_query);
   DSearchResult DoGeoSearch(const DSearchRequest &user_query);
   DSearchResult DoTagSearch(const DSearchRequest &user_query);
+  DSearchResult DoTextSearch(const DSearchRequest &user_query);
   void AddTaskToDB(const DSIndexTask &task);
 
 private:

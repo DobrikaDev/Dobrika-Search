@@ -213,3 +213,82 @@ class TestHealthCheck:
         assert resp.status_code == 200
         assert resp.json().get("status") in ["SearchUnknownType", "SearchInvalidJson"]
 
+
+class TestTextSearch:
+    """Tests for BM25 text search in task_name and task_desc"""
+
+    @pytest.fixture(autouse=True)
+    def setup(self, server_url):
+        """Index test tasks before each test"""
+        self.base_url = server_url
+        self.url_index = f"{server_url}/index"
+        self.url_search = f"{server_url}/search"
+
+        self.test_tasks = [
+            {
+                "task_id": "text_test_1",
+                "task_name": "React frontend разработчик",
+                "task_desc": "Строить UI дашборд на react",
+                "task_type": "TT_OnlineTask",
+            },
+            {
+                "task_id": "text_test_2",
+                "task_name": "Python backend инженер",
+                "task_desc": "Реализация микросервиса на FastApi",
+                "task_type": "TT_OnlineTask",
+            },
+            {
+                "task_id": "text_test_3",
+                "task_name": "Fullstack JavaScript разрабочти",
+                "task_desc": "Node.js and React разработчик приложений",
+                "task_type": "TT_OnlineTask",
+            },
+        ]
+
+        with requests.Session() as session:
+            for task in self.test_tasks:
+                resp = session.post(self.url_index, json=task, timeout=5.0)
+                assert resp.status_code == 200, f"Failed to index task: {resp.text}"
+
+        time.sleep(1)  # Wait for indexing
+
+    def test_search_react_developer(self):
+        """'react developer' should rank text_test_1 first and include text_test_3"""
+        resp = requests.post(self.url_search, json={
+            "user_query": "react разработчик"
+        }, timeout=5.0)
+
+        assert resp.status_code == 200
+        task_ids = resp.json().get("task_id", [])
+        text_ids = [t for t in task_ids if t.startswith("text_test_")]
+
+        assert "text_test_1" in text_ids, f"Expected text_test_1 in results, got: {text_ids}"
+        # If both present, ensure text_test_1 ranks before text_test_3
+        if "text_test_3" in text_ids:
+            assert text_ids.index("text_test_1") < text_ids.index("text_test_3"), \
+                f"Expected text_test_1 ranked before text_test_3: {text_ids}"
+
+    def test_search_python_backend(self):
+        """'python backend' should return text_test_2"""
+        resp = requests.post(self.url_search, json={
+            "user_query": "python backend разработчик"
+        }, timeout=5.0)
+
+        assert resp.status_code == 200
+        task_ids = resp.json().get("task_id", [])
+        text_ids = [t for t in task_ids if t.startswith("text_test_")]
+
+        assert "text_test_2" in text_ids, f"Expected text_test_2 in results, got: {text_ids}"
+        # If multiple, ensure text_test_2 ranks first among text_test_*
+        if text_ids:
+            assert text_ids[0] == "text_test_2", f"Expected text_test_2 first, got: {text_ids}"
+
+    def test_search_fastapi_keyword(self):
+        """'FastAPI' in description should match text_test_2"""
+        resp = requests.post(self.url_search, json={
+            "user_query": "FastAPI"
+        }, timeout=5.0)
+
+        assert resp.status_code == 200
+        task_ids = resp.json().get("task_id", [])
+        assert "text_test_2" in task_ids, f"Expected text_test_2 in results, got: {task_ids}"

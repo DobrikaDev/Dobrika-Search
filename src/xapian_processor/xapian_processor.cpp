@@ -76,11 +76,55 @@ DSearchResult XapianLayer::DoSearch(const DSearchRequest &user_request) {
   case DSQueryTypeEnum::STagTasks:
     return DoTagSearch(user_request);
   case DSQueryTypeEnum::SUnknown:
+    // Fallback: if user provided a textual query, perform text search
+    if (!user_request.user_query().empty()) {
+      return DoTextSearch(user_request);
+    }
     result.set_status(GetSearchStatus(DSearchStatus::DSUnknownTaskType));
     return result;
   }
   result.set_status(GetSearchStatus(DSearchStatus::DSUnknownTaskType));
   return result;
+}
+
+DSearchResult XapianLayer::DoTextSearch(const DSearchRequest &user_request) {
+  DSearchResult result;
+  if (user_request.user_query().empty()) {
+    result.set_status(GetSearchStatus(DSearchStatus::DSUnknownTaskType));
+    return result;
+  }
+
+  try {
+    Xapian::Enquire enq(database);
+    // Ensure BM25 is used explicitly
+    enq.set_weighting_scheme(Xapian::BM25Weight());
+
+    Xapian::QueryParser qp;
+    qp.set_stemmer(Xapian::Stem("russian"));
+    qp.set_stemming_strategy(Xapian::QueryParser::STEM_SOME);
+    qp.set_database(database);
+
+    Xapian::Query query =
+        qp.parse_query(user_request.user_query(), Xapian::QueryParser::FLAG_DEFAULT);
+    enq.set_query(query);
+
+    Xapian::MSet mset = enq.get_mset(SearchConfigProto.search_offset(),
+                                     SearchConfigProto.search_limit());
+
+    for (Xapian::MSetIterator mit = mset.begin(); mit != mset.end(); ++mit) {
+      const std::string &data = mit.get_document().get_data();
+      const std::string task_id = GetField(data, 2); // task_id is at index 2
+      if (!task_id.empty()) {
+        result.add_task_id(task_id);
+      }
+    }
+
+    result.set_status(GetSearchStatus(DSearchStatus::DSOk));
+    return result;
+  } catch (...) {
+    result.set_status(GetSearchStatus(DSearchStatus::DSUnknownTaskType));
+    return result;
+  }
 }
 
 DSearchResult XapianLayer::DoTagSearch(const DSearchRequest &user_request) {
@@ -158,6 +202,14 @@ void XapianLayer::AddTaskToDB(const DSIndexTask &task) {
 
   if (!task.task_name().empty()) {
     termgen.index_text(task.task_name(), 1, "T");
+    // Unprefixed indexing to enable default text search across fields
+    termgen.index_text(task.task_name());
+  }
+
+  if (!task.task_desc().empty()) {
+    // Index description as well (both prefixed and unprefixed)
+    termgen.index_text(task.task_desc(), 1, "T");
+    termgen.index_text(task.task_desc());
   }
 
   for (const auto &tag : task.task_tags()) {
