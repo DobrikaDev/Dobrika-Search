@@ -3,11 +3,11 @@
 #include <catch2/catch_test_macros.hpp>
 #include <filesystem>
 
-#include "xapian_processor/xapian_processor.hpp"
 #include "DSRequest.pb.h"
 #include "DSResponse.pb.h"
 #include "DServer.pb.h"
 #include "tools/config_generator.hpp"
+#include "xapian_processor/xapian_processor.hpp"
 
 namespace fs = std::filesystem;
 
@@ -20,7 +20,7 @@ static void clean_dir(const fs::path &p) {
 TEST_CASE("Cold and hot backups create snapshot directories", "[backup]") {
   clean_dir("db");
   clean_dir("backups-testing");
-  DobrikaServerConfig cfg = MakeServerConfig("db", 30, 15, 0, 20, 2);
+  DobrikaServerConfig cfg = MakeServerConfig("db", 30, 15, 0, 20, 9);
   XapianLayer layer(cfg);
 
   DSIndexTask task;

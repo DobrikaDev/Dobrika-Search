@@ -38,12 +38,14 @@ int main() {
   const int hot = envOrInt("DOBRIKA_HOT_MIN", 15);
   const int off = envOrInt("DOBRIKA_SEARCH_OFFSET", 0);
   const int lim = envOrInt("DOBRIKA_SEARCH_LIMIT", 20);
-  const int gidx = envOrInt("DOBRIKA_GEO_INDEX", 2);
+  const int gidx = envOrInt("DOBRIKA_GEO_INDEX", 9);
 
   DobrikaServerConfig cfg = MakeServerConfig(db, cold, hot, off, lim, gidx);
 
+  std::cerr << "Dobrika web server configuration:\n";
+  std::cerr << cfg.DebugString() << std::endl;
   std::cerr << "Dobrika web server listening on " << addr << ":" << port
-            << " db=" << db << "\n";
+            << std::endl;
   start_server_blocking(cfg, addr, port);
   return 0;
 }

@@ -14,4 +14,5 @@ message DSIndexTask {
     string geo_data = 3;
     string task_id = 4;
     string task_type = 5;
+    repeated string task_tags = 6;
 }

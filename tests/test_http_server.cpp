@@ -22,7 +22,7 @@ TEST_CASE("HTTP index and geo search round-trip", "[http][server]") {
   clean_db(db);
   const uint16_t port = 18080;
   const std::string addr = "127.0.0.1";
-  DobrikaServerConfig cfg = MakeServerConfig(db, 30, 15, 0, 5, 2);
+  DobrikaServerConfig cfg = MakeServerConfig(db, 30, 15, 0, 5, 9);
 
   auto th = start_server_background(cfg, addr, port);
   // Give the server a moment to start
