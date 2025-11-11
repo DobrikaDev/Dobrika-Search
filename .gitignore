@@ -90,3 +90,4 @@ vcpkg_installed/
 
 uploads/
 db/
+.venv/
