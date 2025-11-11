@@ -1,8 +1,10 @@
 #include "xapian_processor.hpp"
 
 #include "static.hpp"
+#include <algorithm>
 #include <chrono>
 #include <filesystem>
+#include <map>
 #include <optional>
 #include <sstream>
 
@@ -68,13 +70,61 @@ DSearchResult XapianLayer::DoSearch(const DSearchRequest &user_request) {
   case DSQueryTypeEnum::SRandomTasks:
     result.set_status(GetSearchStatus((DSearchStatus::DSNotImplemented)));
     return result;
+  case DSQueryTypeEnum::STagTasks:
+    return DoTagSearch(user_request);
   case DSQueryTypeEnum::SUnknown:
     result.set_status(GetSearchStatus(DSearchStatus::DSUnknownTaskType));
     return result;
   }
-  // Fallback, should be unreachable
   result.set_status(GetSearchStatus(DSearchStatus::DSUnknownTaskType));
   return result;
+}
+
+DSearchResult XapianLayer::DoTagSearch(const DSearchRequest &user_request) {
+  DSearchResult result;
+
+  if (user_request.user_tags().empty()) {
+    result.set_status(GetSearchStatus(DSearchStatus::DSUnknownTaskType));
+    return result;
+  }
+
+  try {
+    Xapian::Enquire enq(database);
+
+    std::vector<Xapian::Query> queries;
+
+    for (const auto &tag : user_request.user_tags()) {
+      if (!tag.empty()) {
+        queries.push_back(Xapian::Query("TAG" + tag));
+      }
+    }
+
+    if (queries.empty()) {
+      result.set_status(GetSearchStatus(DSearchStatus::DSUnknownTaskType));
+      return result;
+    }
+
+    Xapian::Query combined_query(Xapian::Query::OP_OR, queries.begin(),
+                                 queries.end());
+    enq.set_query(combined_query);
+
+    Xapian::MSet mset = enq.get_mset(SearchConfigProto.search_offset(),
+                                     SearchConfigProto.search_limit());
+
+    for (Xapian::MSetIterator mit = mset.begin(); mit != mset.end(); ++mit) {
+      const std::string &data = mit.get_document().get_data();
+      const std::string task_id = GetField(data, 2); // task_id is at index 2
+      if (!task_id.empty()) {
+        result.add_task_id(task_id);
+      }
+    }
+
+    result.set_status(GetSearchStatus(DSearchStatus::DSOk));
+    return result;
+  } catch (...) {
+    result.set_status(GetSearchStatus(DSearchStatus::DSUnknownTaskType));
+    return result;
+  }
 }
 
 void XapianLayer::AddTaskToDB(const DSIndexTask &task) {
@@ -86,10 +136,13 @@ void XapianLayer::AddTaskToDB(const DSIndexTask &task) {
   {
     std::ostringstream data;
     // data fields are newline-separated. Index 2 should be task_id for
-    // retrieval.
+    // retrieval. Index 3 onwards are task tags.
     data << task.task_name() << '\n'
          << task.task_desc() << '\n'
          << task.task_id();
+    for (const auto &tag : task.task_tags()) {
+      data << '\n' << tag;
+    }
     doc.set_data(data.str());
   }
 
@@ -100,6 +153,13 @@ void XapianLayer::AddTaskToDB(const DSIndexTask &task) {
   if (!task.task_name().empty()) {
     termgen.index_text(task.task_name(), 1, "T");
   }
+
+  for (const auto &tag : task.task_tags()) {
+    if (!tag.empty()) {
+      doc.add_term("TAG" + tag);
+    }
+  }
+
   Xapian::LatLongCoords coords;
   if (OptionalGeoData geo = ParseGeo(task.geo_data())) {
     coords.append(Xapian::LatLongCoord(geo->first, geo->second));
@@ -128,7 +188,6 @@ bool XapianLayer::PerformHotBackup(const std::string &backup_root) {
 }
 
 void XapianLayer::StartBackupScheduler(const std::string &backup_root) {
-  // Make repeated calls safe: stop existing threads if any
   StopBackupScheduler();
   {
     std::lock_guard<std::mutex> lk(sched_mutex);

@@ -9,8 +9,8 @@
 #include "DSResponse.pb.h"
 #include "DServer.pb.h"
 
-#include "xapian_processor/xapian_processor.hpp"
 #include "tools/config_generator.hpp"
+#include "xapian_processor/xapian_processor.hpp"
 
 namespace fs = std::filesystem;
 
@@ -26,7 +26,7 @@ TEST_CASE("Index single task and verify presence via Xapian",
           "[xapian][index]") {
 
   clean_db("test_db");
-  DobrikaServerConfig cfg = MakeServerConfig("test_db", 30, 15, 0, 20, 2);
+  DobrikaServerConfig cfg = MakeServerConfig("test_db", 30, 15, 0, 20, 9);
   XapianLayer layer(cfg);
 
   DSIndexTask task;
@@ -50,7 +50,7 @@ TEST_CASE("Geo search returns the same task_id that was indexed",
           "[xapian][geo][task_id]") {
   clean_db("geo_id_db");
   // search_limit = 5, geo index points to 3rd field (task_id) in stored data
-  DobrikaServerConfig cfg = MakeServerConfig("geo_id_db", 30, 15, 0, 5, 2);
+  DobrikaServerConfig cfg = MakeServerConfig("geo_id_db", 30, 15, 0, 5, 9);
   XapianLayer layer(cfg);
 
   DSIndexTask task;
@@ -75,7 +75,7 @@ TEST_CASE("Geo search returns nearest N task_ids (limited by search_limit)",
   clean_db("geo_nearest_db");
   const int search_limit = 3;
   DobrikaServerConfig cfg =
-      MakeServerConfig("geo_nearest_db", 30, 15, 0, search_limit, 2);
+      MakeServerConfig("geo_nearest_db", 30, 15, 0, search_limit, 9);
   XapianLayer layer(cfg);
 
   // Seed N tasks at increasing distance from (55.0000, 37.0000)
@@ -106,45 +106,3 @@ TEST_CASE("Geo search returns nearest N task_ids (limited by search_limit)",
   REQUIRE(res.task_id(1) == "id1");
   REQUIRE(res.task_id(2) == "id2");
 }
-// TEST_CASE("Concurrent write and read does not data race",
-//           "[xapian][concurrency]") {
-//   clean_db();
-//   DobrikaServerConfig cfg = MakeServerConfig("db", 30, 15, 0, 20);
-//   XapianLayer layer(cfg);
-
-//   std::atomic<bool> stop{false};
-
-//   // Writer thread
-//   std::thread writer([&]() {
-//     for (int i = 0; i < 50; ++i) {
-//       DSE_IndexTask t;
-//       t.set_taskname(std::string("Task ") + std::to_string(i));
-//       t.set_taskdesc("desc");
-//       t.set_geodata("55.7,37.6");
-//       layer.AddTaskToDB(t);
-//       std::this_thread::sleep_for(std::chrono::milliseconds(5));
-//     }
-//     stop = true;
-//   });
-
-//   std::thread reader([&]() {
-//     while (!stop.load()) {
-//       SE_Item q;
-//       q.set_processedquery("Task");
-//       q.set_geodata("55.7,37.6");
-//       (void)layer.GetSearchResult(q);
-//     }
-//   });
-
-//   writer.join();
-//   reader.join();
-
-//   Xapian::Database db("db");
-//   Xapian::QueryParser qp;
-//   qp.add_prefix("", "T");
-//   Xapian::Query q = qp.parse_query("Task",
-//   Xapian::QueryParser::FLAG_DEFAULT); Xapian::Enquire enq(db);
-//   enq.set_query(q);
-//   auto mset = enq.get_mset(0, 10);
-//   REQUIRE(mset.size() >= 1);
-// }

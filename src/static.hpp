@@ -4,7 +4,13 @@
 #include <map>
 #include <string>
 
-enum DSQueryTypeEnum { SGeoTasks, SOnlyOnlineTasks, SRandomTasks, SUnknown };
+enum DSQueryTypeEnum {
+  SGeoTasks,
+  SOnlyOnlineTasks,
+  SRandomTasks,
+  STagTasks,
+  SUnknown
+};
 
 inline const std::map<std::string, DSQueryTypeEnum> kQueryTypeByString = {
     {
@@ -12,7 +18,8 @@ inline const std::map<std::string, DSQueryTypeEnum> kQueryTypeByString = {
         DSQueryTypeEnum::SOnlyOnlineTasks,
     },
     {"QT_GeoTasks", DSQueryTypeEnum::SGeoTasks},
-    {"QT_RandomTasks", DSQueryTypeEnum::SRandomTasks}};
+    {"QT_RandomTasks", DSQueryTypeEnum::SRandomTasks},
+    {"QT_TagTasks", DSQueryTypeEnum::STagTasks}};
 
 inline DSQueryTypeEnum GetTaskType(const DSearchRequest &request) {
   const auto it = kQueryTypeByString.find(request.query_type());

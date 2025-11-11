@@ -1,6 +1,6 @@
 #include "server/web_server.hpp"
-#include "static.hpp"
 #include "DServer.pb.h"
+#include "static.hpp"
 #include "xapian_processor/xapian_processor.hpp"
 #include <atomic>
 #include <chrono>
@@ -25,6 +25,11 @@ DSIndexTask MakeTaskFromJson(const Json::Value &json) {
     task.set_task_id(json["task_id"].asString());
   if (json.isMember("task_type"))
     task.set_task_type(json["task_type"].asString());
+  if (json.isMember("task_tags") && json["task_tags"].isArray()) {
+    for (const auto &t : json["task_tags"]) {
+      task.add_task_tags(t.asString());
+    }
+  }
   return task;
 }
 
