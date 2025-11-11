@@ -26,13 +26,37 @@ jobs:
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y cmake build-essential libxapian-dev protobuf-compiler
+          sudo apt-get install -y \
+            build-essential \
+            cmake \
+            git \
+            pkg-config \
+            libxapian-dev \
+            libprotobuf-dev \
+            protobuf-compiler \
+            libjsoncpp-dev \
+            uuid-dev \
+            zlib1g-dev \
+            libssl-dev
+      
+      - name: Install Drogon framework
+        run: |
+          set -e
+          cd /tmp
+          git clone --depth 1 --branch v1.8.7 https://github.com/drogonframework/drogon.git
+          cd drogon
+          git submodule update --init
+          mkdir build && cd build
+          cmake .. -DCMAKE_BUILD_TYPE=Release -DBUILD_EXAMPLES=OFF -DBUILD_CTL=OFF
+          make -j"$(nproc)"
+          sudo make install
+          sudo ldconfig
       
       - name: Build server
         run: |
           mkdir -p build
           cd build
-          cmake ..
+          cmake .. -DDOBRIKA_WITH_SERVER=ON
           make dobrika_server_main -j$(nproc)
       
       - name: Run quality tests
@@ -67,13 +91,37 @@ jobs:
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y cmake build-essential libxapian-dev protobuf-compiler
+          sudo apt-get install -y \
+            build-essential \
+            cmake \
+            git \
+            pkg-config \
+            libxapian-dev \
+            libprotobuf-dev \
+            protobuf-compiler \
+            libjsoncpp-dev \
+            uuid-dev \
+            zlib1g-dev \
+            libssl-dev
+      
+      - name: Install Drogon framework
+        run: |
+          set -e
+          cd /tmp
+          git clone --depth 1 --branch v1.8.7 https://github.com/drogonframework/drogon.git
+          cd drogon
+          git submodule update --init
+          mkdir build && cd build
+          cmake .. -DCMAKE_BUILD_TYPE=Release -DBUILD_EXAMPLES=OFF -DBUILD_CTL=OFF
+          make -j"$(nproc)"
+          sudo make install
+          sudo ldconfig
       
       - name: Build server
         run: |
           mkdir -p build
           cd build
-          cmake ..
+          cmake .. -DDOBRIKA_WITH_SERVER=ON
           make dobrika_server_main -j$(nproc)
       
       - name: Run performance tests
