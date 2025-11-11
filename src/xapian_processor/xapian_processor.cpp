@@ -6,6 +6,7 @@
 #include <filesystem>
 #include <map>
 #include <optional>
+#include <set>
 #include <sstream>
 
 namespace fs = std::filesystem;
@@ -51,8 +52,10 @@ DSearchResult XapianLayer::DoGeoSearch(const DSearchRequest &user_query) {
                                    SearchConfigProto.search_limit());
   for (Xapian::MSetIterator mit = mset.begin(); mit != mset.end(); ++mit) {
     const std::string &data = mit.get_document().get_data();
-    const auto tid = GetField(data, SearchConfigProto.search_geo_index());
-    result.add_task_id(tid);
+    const std::string task_id = GetField(data, 2); // task_id is at index 2
+    if (!task_id.empty()) {
+      result.add_task_id(task_id);
+    }
   }
   result.set_status(GetSearchStatus(DSearchStatus::DSOk));
   return result;
@@ -111,11 +114,14 @@ DSearchResult XapianLayer::DoTagSearch(const DSearchRequest &user_request) {
     Xapian::MSet mset = enq.get_mset(SearchConfigProto.search_offset(),
                                      SearchConfigProto.search_limit());
 
+    // Use a set to deduplicate results
+    std::set<std::string> seen_task_ids;
     for (Xapian::MSetIterator mit = mset.begin(); mit != mset.end(); ++mit) {
       const std::string &data = mit.get_document().get_data();
       const std::string task_id = GetField(data, 2); // task_id is at index 2
-      if (!task_id.empty()) {
+      if (!task_id.empty() && seen_task_ids.find(task_id) == seen_task_ids.end()) {
         result.add_task_id(task_id);
+        seen_task_ids.insert(task_id);
       }
     }
 
@@ -168,7 +174,8 @@ void XapianLayer::AddTaskToDB(const DSIndexTask &task) {
   }
   doc.add_value(SearchConfigProto.search_geo_index(), coords.serialise());
 
-  wdb.add_document(doc);
+  // Use replace_document with task_id as unique identifier to avoid duplicates
+  wdb.replace_document("ID" + task.task_id(), doc);
   wdb.commit();
   database.reopen();
 }

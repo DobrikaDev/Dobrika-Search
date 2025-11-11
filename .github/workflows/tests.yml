@@ -1,0 +1,91 @@
+name: Quality Tests
+
+on:
+  push:
+    branches: [ main, feature/* ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test-quality:
+    name: Quality Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+      
+      - name: Install Python dependencies
+        run: |
+          cd dev
+          pip install -r requirements.txt
+      
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake build-essential libxapian-dev protobuf-compiler
+      
+      - name: Build server
+        run: |
+          mkdir -p build
+          cd build
+          cmake ..
+          make dobrika_server_main -j$(nproc)
+      
+      - name: Run quality tests
+        run: |
+          cd dev
+          RUN_SERVER=1 DOBRIKA_BINARY=../build/dobrika_server_main pytest test_quality.py -v --tb=short
+        timeout-minutes: 10
+      
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: test-results
+          path: dev/
+
+  test-performance:
+    name: Performance Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+      
+      - name: Install Python dependencies
+        run: |
+          cd dev
+          pip install -r requirements.txt
+      
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake build-essential libxapian-dev protobuf-compiler
+      
+      - name: Build server
+        run: |
+          mkdir -p build
+          cd build
+          cmake ..
+          make dobrika_server_main -j$(nproc)
+      
+      - name: Run performance tests
+        run: |
+          cd dev
+          RUN_SERVER=1 DOBRIKA_BINARY=../build/dobrika_server_main pytest test_performance.py -v --benchmark-only
+        timeout-minutes: 30
+      
+      - name: Upload performance results
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: performance-results
+          path: dev/
+

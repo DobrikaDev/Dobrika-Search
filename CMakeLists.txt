@@ -53,9 +53,9 @@ target_link_libraries(dobrika_search
 target_compile_options(dobrika_search PRIVATE -Wall -Wextra -Wpedantic)
 
 ########################################
-# Tests
+# Web Server (Optional)
 ########################################
-option(DOBRIKA_WITH_SERVER "Build Drogon-based HTTP server and HTTP tests" OFF)
+option(DOBRIKA_WITH_SERVER "Build Drogon-based HTTP server" OFF)
 if (DOBRIKA_WITH_SERVER)
   find_package(Drogon QUIET CONFIG)
   if (NOT Drogon_FOUND)
@@ -138,7 +138,7 @@ if (DOBRIKA_WITH_SERVER)
     endif()
   endif()
   if (HAVE_DROGON)
-    message(STATUS "Drogon found: enabling web server and HTTP tests")
+    message(STATUS "Drogon found: enabling web server")
     
     # Ensure jsoncpp is available for Drogon's headers
     pkg_check_modules(JSONCPP REQUIRED jsoncpp)
@@ -171,44 +171,6 @@ if (DOBRIKA_WITH_SERVER)
     message(WARNING "Drogon not found; web server targets will not be built")
   endif()
 endif()
-FetchContent_Declare(
-  Catch2
-  GIT_REPOSITORY https://github.com/catchorg/Catch2.git
-  GIT_TAG v3.5.2
-)
-FetchContent_MakeAvailable(Catch2)
 
-enable_testing()
-
-add_executable(dse_tests
-    ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_xapian_layer.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_backup.cpp
-)
-
-target_link_libraries(dse_tests
-    PRIVATE
-    dobrika_search
-    Catch2::Catch2WithMain
-    ${Protobuf_LIBRARIES}
-    ${XAPIAN_LIBRARIES}
-    Threads::Threads
-)
-
-add_test(NAME dse_tests COMMAND dse_tests)
-
-if (DOBRIKA_WITH_SERVER AND HAVE_DROGON)
-    add_executable(dse_http_tests
-        ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_http_server.cpp
-    )
-    target_include_directories(dse_http_tests
-        PRIVATE
-        ${JSONCPP_INCLUDE_DIRS}
-    )
-    target_link_libraries(dse_http_tests
-        PRIVATE
-        dobrika_server
-        Catch2::Catch2WithMain
-        ${JSONCPP_LIBRARIES}
-    )
-    add_test(NAME dse_http_tests COMMAND dse_http_tests)
-endif()
+# Python tests are run via pytest in CI/CD
+# See .github/workflows/tests.yml and dev/pytest.ini
