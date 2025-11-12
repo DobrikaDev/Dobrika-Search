@@ -1,385 +1,135 @@
 # 🔎 Dobrika Search Engine
 
-Lightweight search service built on top of Xapian, exposed via a fast C++ HTTP API with Drogon. Includes a small toolset and tests.
+Dobrika — лёгкий HTTP‑поисковик на C++17: Xapian в качестве движка, Drogon как веб‑фреймворк, gRPC/Protobuf модели и минимальный набор утилит.
 
-## Features
-- Xapian-backed search layer with simple indexing and querying
-- HTTP server (Drogon) exposing:
-  - `GET /healthz` — health check
-  - `POST /index` — index one task
-  - `POST /search` — search by text (and optional geo/query type)
-- Protobuf models for requests/responses
-- Catch2 unit tests
-- Dev utilities: JSON dataset and Python load-testing script
+---
 
-## Requirements
-- Linux, macOS (Linux recommended)
-- CMake ≥ 3.15
-- C++17 toolchain (e.g., GCC 11+ or Clang 13+)
-- pkg-config
-- Protobuf (libprotobuf, protoc)
-- Xapian (xapian-core)
-- Drogon (and its deps: trantor, jsoncpp, zlib, etc.)
+## Quick Start
 
-On Ubuntu/Debian:
+### 1. Native build (Linux)
 ```bash
-sudo apt update
-sudo apt install -y build-essential cmake pkg-config \
-  libprotobuf-dev protobuf-compiler \
-  libxapian-dev \
-  libdrogon-dev \
-  libjsoncpp-dev
-```
+sudo apt update && sudo apt install -y \
+  build-essential cmake pkg-config libprotobuf-dev protobuf-compiler \
+  libxapian-dev libdrogon-dev libjsoncpp-dev
 
-If your distro provides Drogon via CMake config (`DrogonConfig.cmake`) it will be auto-detected. If not, the build will try a pkg-config fallback and then a manual header/lib search.
-
-## Build
-Configure and build (Release):
-```bash
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DDOBRIKA_WITH_SERVER=ON
 cmake --build build -j
 ```
 
-The build produces:
-- `build/dobrika_search` (static library)
-- `build/dobrika_server_main` (HTTP server)
-- `build/dse_tests` (unit tests)
-- `build/dse_http_tests` (HTTP tests; only if Drogon found)
-
-## Run the server
-The server is configured via environment variables:
-- `DOBRIKA_ADDR` (default `127.0.0.1`)
-- `DOBRIKA_PORT` (default `8088`)
-- `DOBRIKA_DB_PATH` (default `db`)
-- `DOBRIKA_COLD_MIN` (default `30`)
-- `DOBRIKA_HOT_MIN` (default `15`)
-- `DOBRIKA_SEARCH_OFFSET` (default `0`)
-- `DOBRIKA_SEARCH_LIMIT` (default `20`)
-- `DOBRIKA_GEO_INDEX` (default `2`)
-
-Start:
+Запуск:
 ```bash
 ./build/dobrika_server_main
-```
-
-Custom port/db:
-```bash
-DOBRIKA_ADDR=0.0.0.0 DOBRIKA_PORT=8090 DOBRIKA_DB_PATH=/tmp/dse-db \
+# или с переопределением окружения
+DOBRIKA_ADDR=0.0.0.0 DOBRIKA_PORT=8088 DOBRIKA_DB_PATH=/tmp/dobrika-db \
   ./build/dobrika_server_main
 ```
 
-## API Documentation
+API:
+- `POST /index` — добавить задачу
+- `POST /search` — поиск (текст, гео, тэги)
+- `GET /healthz` — проверка живости
+- `GET /metrics` — Prometheus‑метрики
 
-### Endpoints Overview
-- `GET /healthz` — Health check
-- `POST /index` — Index a new task
-- `POST /search` — Search for tasks
-
-### Request/Response Models
-
-#### Index Task (`POST /index`)
-
-**Request:**
-```json
-{
-  "task_name": "string",      // Task name (indexed)
-  "task_desc": "string",      // Task description (indexed)
-  "task_id": "string",        // Unique task identifier (required)
-  "geo_data": "lat,lon",      // Geo coordinates as "latitude,longitude"
-  "task_type": "string"       // Task type: "TT_OnlineTask" or "TT_OfflineTask"
-}
-```
-
-**Response:**
-```json
-{
-  "status": "string"          // Status: "SearchIndexOk" or "SearchIndexFall"
-}
-```
-
-**Example:**
+### 2. Docker / docker-compose
 ```bash
-curl -X POST http://127.0.0.1:8088/index \
-  -H 'Content-Type: application/json' \
-  -d '{
-    "task_name": "Web development",
-    "task_desc": "Need help building a React app",
-    "geo_data": "55.75,37.61",
-    "task_id": "task-123",
-    "task_type": "TT_OnlineTask"
-  }'
+./docker-run.sh build   # собрали образ
+./docker-run.sh up      # подняли сервис на 127.0.0.1:8088
+./docker-run.sh logs    # смотрим логи
 ```
 
-#### Search Tasks (`POST /search`)
+Переменная `DOBRIKA_LOG_REQUESTS=1` включает вывод каждого HTTP‑запроса (полезно в тестах).
 
-**Request:**
-```json
-{
-  "user_query": "string",           // Search query (text search in name/desc)
-  "query_type": "string",           // Query type (optional):
-                                    //   "QT_GeoTasks" - search with geo filter
-                                    //   "QT_OnlineTasks" - online tasks only
-                                    //   "QT_RandomTasks" - random results
-  "geo_data": "lat,lon",            // Geo coordinates for QT_GeoTasks
-  "user_tags": ["tag1", "tag2"]     // Tags for filtering (optional)
-}
-```
-
-**Response:**
-```json
-{
-  "task_id": ["id1", "id2", ...],   // Array of matching task IDs
-  "status": "string"                // Status: "SearchOk", "SearchUnknownType", etc.
-}
-```
-
-**Example 1: Text search**
-```bash
-curl -X POST http://127.0.0.1:8088/search \
-  -H 'Content-Type: application/json' \
-  -d '{
-    "user_query": "React development",
-    "query_type": "QT_OnlineTasks"
-  }'
-```
-
-**Example 2: Geo-based search**
-```bash
-curl -X POST http://127.0.0.1:8088/search \
-  -H 'Content-Type: application/json' \
-  -d '{
-    "user_query": "python",
-    "query_type": "QT_GeoTasks",
-    "geo_data": "55.75,37.61"
-  }'
-```
-
-### Status Codes
-- `SearchOk` — Search completed successfully
-- `SearchIndexOk` — Task indexed successfully
-- `SearchIndexFall` — Indexing failed
-- `SearchHealthOk` — Server is healthy
-- `SearchUnknownType` — Unknown query/task type
-- `SearchNotImplemented` — Feature not implemented
-- `SearchInvalidJson` — Invalid JSON in request
-
-### HTTP quick test (curl)
-- Health:
-```bash
-curl -sS http://127.0.0.1:8088/healthz
-```
-
-## Python load test
-Files:
-- `dev/data/bulk_tasks.json` — 50 задач с разной геолокацией
-- `dev/load_test.py` — скрипт обстрела
-- `dev/requirements.txt` — зависимости (requests)
-
-Установка зависимостей:
-```bash
-python3 -m pip install -r dev/requirements.txt
-```
-
-Вариант 1: сервер уже поднят на 127.0.0.1:8088
-```bash
-python3 dev/load_test.py --concurrency 16 --search-requests 500
-```
-
-Вариант 2: скрипт сам поднимет сервер и обстреляет (порт 8090):
-```bash
-python3 dev/load_test.py --run-server --port 8090 --db /tmp/dse-db \
-  --concurrency 12 --search-requests 300
-```
-
-Полезные флаги:
-- `--host`, `--port`
-- `--tasks-file` (путь к JSON), `--index-limit` (по умолчанию 50)
-- `--concurrency`
-- `--search-requests`
-- `--binary` (путь к `dobrika_server_main`, по умолчанию `build/dobrika_server_main`)
-
-Скрипт выводит агрегаты: успехи/ошибки, avg/p50/p95 и общее время на индексацию/поиск.
-
-## Tests
-Собрать и запустить:
-```bash
-cmake --build build -j --target dse_tests
-ctest --test-dir build --output-on-failure
-```
-
-HTTP-тесты (если Drogon найден):
-```bash
-cmake --build build -j --target dse_http_tests
-ctest --test-dir build -R dse_http_tests --output-on-failure
-```
-
-## Troubleshooting
-- Port already in use:
-  ```bash
-  sudo ss -lptn 'sport = :8088'
-  sudo fuser -k 8088/tcp
-  ```
-- Drogon not found:
-  - Установите `libdrogon-dev` (или соберите Drogon из исходников)
-  - Убедитесь, что есть либо CMake-конфиг (`DrogonConfig.cmake`), либо pkg-config файл
-- Missing json/json.h:
-  - Установите `libjsoncpp-dev`
-- Прочее: удалите `build/` и пересоберите:
-  ```bash
-  rm -rf build
-  cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DDOBRIKA_WITH_SERVER=ON
-  cmake --build build -j
-  ```
-
-## Docker
-
-### Prebuilt Image
-
-Pushes from `main` publish a container image to GitHub Container Registry:
-
-- Image: `ghcr.io/slipneff/dobrika-search:latest`
-- Digest-tagged images are also available per commit SHA.
-
-You can pull it directly:
-
-```bash
-docker pull ghcr.io/slipneff/dobrika-search:latest
-```
-
-### Quick Start
-Build and run the server in Docker:
-
-```bash
-# Build the image
-docker compose build
-
-# Start the server (background)
-docker compose up -d
-
-# View logs
-docker compose logs -f
-
-# Stop the server
-docker compose down
-```
-
-### Using the Helper Script
-A convenience script is provided:
-
-```bash
-# Build
-./docker-run.sh build
-
-# Start
-./docker-run.sh up
-
-# View logs
-./docker-run.sh logs
-
-# Open shell in container
-./docker-run.sh shell
-
-# Stop
-./docker-run.sh down
-
-# Clean up (remove containers, images, volumes)
-./docker-run.sh clean
-
-# Check status
-./docker-run.sh status
-```
-
-### Configuration
-The Docker setup:
-- **Image**: Multi-stage build (optimized ~200MB runtime)
-- **Port**: `8080` (container runs with `DOBRIKA_PORT=8080`)
-- **Volumes**:
-  - `dobrika-db` — named volume that persists the Xapian database
-  - `./uploads` — temporary upload storage
-- **User**: Non-root user (`dobrika:1000:1000`) for security
-- **Environment**:
-  - `DOBRIKA_ADDR=0.0.0.0`
-  - `DOBRIKA_PORT=8080`
-  - `DOBRIKA_DB_PATH=/app/db`
-  - `DOBRIKA_LOG_REQUESTS=0` — set to `1/true/on` to log every HTTP request with body (useful for tests)
-  - Search tuning knobs (`DOBRIKA_COLD_MIN`, `DOBRIKA_HOT_MIN`, `DOBRIKA_SEARCH_OFFSET`, `DOBRIKA_SEARCH_LIMIT`, `DOBRIKA_GEO_INDEX`)
-
-To mount a host directory instead of the named volume (for debugging/backups), replace the `dobrika-db:/app/db` entry in `docker-compose.yml` with `./db:/app/db` and make sure the host folder exists and is owned by UID/GID `1000:1000`.
-
-### HTTP API Access
-Once running, the API is available at `http://localhost:8080`:
-
-```bash
-# Health check
-curl http://localhost:8080/healthz
-
-# Index a task
-curl -X POST http://localhost:8080/index \
-  -H 'Content-Type: application/json' \
-  -d '{
-    "task_name": "demo",
-    "task_desc": "simple doc",
-    "geo_data": "55.75,37.61",
-    "task_id": "task-1",
-    "task_type": "default"
-  }'
-
-# Search
-curl -X POST http://localhost:8080/search \
-  -H 'Content-Type: application/json' \
-  -d '{"query": "simple"}'
-```
-
-### Troubleshooting
-- **Permission denied on socket**: Run with `sudo` or add user to docker group:
-  ```bash
-  sudo usermod -aG docker $USER
-  newgrp docker
-  ```
-- **Port already in use**:
-  ```bash
-  sudo lsof -i :8080
-  sudo kill -9 <PID>
-  ```
-- **Permission errors on uploads or custom bind mounts**: Ensure the host directory is writable by UID/GID `1000:1000`:
-  ```bash
-  sudo chown -R 1000:1000 ./db ./uploads
-  sudo chmod -R 755 ./db ./uploads
-  ```
-
-## Kubernetes Deployment
-
-Manifests under `deployments/k8s/` provision the service in a cluster. Apply them as-is for a single-replica demo deployment:
-
+### 3. Kubernetes (demo manifests)
 ```bash
 kubectl apply -f deployments/k8s/configmap.yaml
 kubectl apply -f deployments/k8s/deployment.yaml
 kubectl apply -f deployments/k8s/service.yaml
 ```
 
-Key details:
-- Uses the GHCR image `ghcr.io/slipneff/dobrika-search:latest`.
-- Environment variables are sourced from the `search-engine-config` ConfigMap.
-- Pod security context runs the container as UID/GID 1000 to match the image.
-- An `emptyDir` volume backs `/app/db`; replace with a PVC for persistent storage.
-- HTTP health probes hit `/healthz` on port 8080.
-
-Customize the ConfigMap values or replica counts as needed before applying in production.
-
-## CI/CD
-
-GitHub Actions workflow `.github/workflows/ci.yml` runs on every push and pull request. It:
-- Installs C++ dependencies, configures CMake, builds the server, and runs unit tests.
-- Builds the Docker image with BuildKit.
-- Pushes `ghcr.io/<owner>/dobrika-search` tags (`latest` and commit SHA) whenever the `main` branch succeeds; pull requests build without pushing.
-
-Set additional secrets (for example `GHCR_PAT`) if you prefer pushing to another registry.
-
-## Project structure
-- `src/xapian_processor` — Xapian слой
-- `src/server` — HTTP сервер (Drogon)
-- `src/proto` — protobuf-модели
-- `tests` — тесты (Catch2)
-- `dev` — помощники для разработки (load test, JSON-данные)
+Манифесты развёртывают один Pod с образом `ghcr.io/slipneff/dobrika-search:latest`, пробрасывают `/metrics` и `/healthz`, используют `emptyDir` под Xapian‑базу (замените на PVC для продакшена).
 
 ---
+
+## Configuration
+
+| Env var | Default | Назначение |
+| --- | --- | --- |
+| `DOBRIKA_ADDR` | `127.0.0.1` | Адрес, на котором слушает сервер |
+| `DOBRIKA_PORT` | `8088` | Порт HTTP‑сервера |
+| `DOBRIKA_DB_PATH` | `db` | Путь к каталогу с Xapian БД |
+| `DOBRIKA_COLD_MIN` / `DOBRIKA_HOT_MIN` | `30` / `15` | Периоды бэкапов (мин.) |
+| `DOBRIKA_SEARCH_OFFSET` | `0` | Начальный offset результатов |
+| `DOBRIKA_SEARCH_LIMIT` | `20` | Количество результатов |
+| `DOBRIKA_GEO_INDEX` | `9` | Слот Xapian для гео‑индекса |
+| `DOBRIKA_LOG_REQUESTS` | `0` | `1/true/on` — логировать каждую жалобу с телом |
+
+Каталог `db/` должен принадлежать пользователю процесса. Для Docker Compose мы используем именованный volume `dobrika-db`, поэтому проблем с правами не возникает.
+
+---
+
+## Monitoring & Metrics
+
+Сервер экспортирует Prometheus-метрики на том же порту, что и HTTP API:
+```
+GET /metrics
+```
+
+### Просмотр метрик из «боевого» кластера локально
+
+1. **Пробросьте сервис из кластера:**
+   ```bash
+   kubectl port-forward svc/search-engine 18088:8080
+   ```
+   Пока команда работает, `http://localhost:18088/metrics` отдаёт live-метрики.
+
+2. **Запустите локальные Prometheus + Grafana** (используется `network_mode: host`):
+   ```bash
+   docker compose -f monitoring/docker-compose.yml up -d
+   ```
+   Конфиг `monitoring/prometheus.yml` уже нацелен на `localhost:18088`.
+
+3. **Проверьте Prometheus:** `http://localhost:9090/targets` → job `dobrika-prod` должен быть `UP`.
+
+4. **Grafana:** `http://localhost:3000` (логин/пароль `admin / admin`).  
+   Источник данных → Prometheus → URL `http://localhost:9090` → Save & Test.  
+   Панели можно собирать из метрик `dobrika_search_requests_total`, `rate(...)` и т.п.
+
+5. **Lens:** в настройках кластера укажите Prometheus endpoint `http://localhost:9090` — графики в Lens подтянутся автоматически.
+
+> Минимальный мониторинг в кластере: установите `metrics-server`, чтобы Lens показывал нагрузку CPU/Mem даже без Prometheus.
+
+---
+
+## Testing & Tooling
+
+- **CMake tests**
+  ```bash
+  cmake --build build -j --target dse_tests
+  ctest --test-dir build --output-on-failure
+  ```
+- **HTTP интеграционные тесты** (`dev/test_quality.py`): требуют работающий сервер (локально или по `RUN_SERVER=1`).
+- **Нагрузочный скрипт** `dev/load_test.py`: использует `dev/data/bulk_tasks.json`.
+
+---
+
+## Troubleshooting
+
+- **DatabaseLockError при старте** — у процесса нет прав на `DOBRIKA_DB_PATH`. Исправьте владельца (`chown -R $USER db`) или используйте отдельный каталог (`DOBRIKA_DB_PATH=/tmp/dobrika-db`).
+- **Порт занят** — проверьте `sudo ss -lptn 'sport = :8088'` или поменяйте `DOBRIKA_PORT`.
+- **Метрики не видны в Grafana** — убедитесь, что порт‑форвард активен и Prometheus (`http://localhost:9090/targets`) показывает target `UP`.
+- **Логи запросов не появляются** — проверьте переменную `DOBRIKA_LOG_REQUESTS` и перезапустите сервис после изменения.
+
+---
+
+## Project Layout
+
+- `src/server/` — HTTP‑сервер и запуск (`main.cpp`, `web_server.cpp`)
+- `src/xapian_processor/` — работа с Xapian (индексация, поиск, бэкапы)
+- `src/tools/` — утилиты (генератор конфигурации и пр.)
+- `dev/` — тесты, pytest-fixtures, данные для нагрузочного прогона
+- `monitoring/` — локальный Prometheus + Grafana для просмотра метрик
+- `deployments/k8s/` — Kubernetes manifests
+
+---
+
+На этом всё: собирайте, запускайте, смотрите метрики и логи. Если нужна дополнительная автоматизация или дашборды — добавляйте поверх существующей структуры. Удачи! 

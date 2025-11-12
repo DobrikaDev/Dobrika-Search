@@ -3,10 +3,13 @@ import shutil
 import signal
 import socket
 import subprocess
+import sys
+import threading
 import time
 from contextlib import closing
 from pathlib import Path
-from typing import Optional
+from collections import deque
+from typing import Deque, Optional
 
 import pytest
 import requests
@@ -50,6 +53,37 @@ def _wait_for_health(url: str, timeout_s: float = 15.0) -> None:
     raise RuntimeError(f"Server not healthy at {url}/healthz within timeout")
 
 
+def _forward_process_output(proc: subprocess.Popen[str]) -> tuple[Deque[str], Deque[str]]:
+    stdout_buf: Deque[str] = deque(maxlen=200)
+    stderr_buf: Deque[str] = deque(maxlen=200)
+
+    def _reader(stream, buf: Deque[str], label: str, target):
+        try:
+            for line in iter(stream.readline, ""):
+                stripped = line.rstrip("\n")
+                if stripped:
+                    buf.append(stripped)
+                print(f"[dobrika {label}] {stripped}", file=target)
+                target.flush()
+        finally:
+            stream.close()
+
+    if proc.stdout:
+        threading.Thread(
+            target=_reader,
+            args=(proc.stdout, stdout_buf, "stdout", sys.stdout),
+            daemon=True,
+        ).start()
+    if proc.stderr:
+        threading.Thread(
+            target=_reader,
+            args=(proc.stderr, stderr_buf, "stderr", sys.stderr),
+            daemon=True,
+        ).start()
+
+    return stdout_buf, stderr_buf
+
+
 @pytest.fixture(scope="session")
 def server_url(tmp_path_factory: pytest.TempPathFactory) -> str:
     """
@@ -65,12 +99,15 @@ def server_url(tmp_path_factory: pytest.TempPathFactory) -> str:
     addr = os.environ.get("DOBRIKA_ADDR") or os.environ.get("DOBRIKA_HOST") or "127.0.0.1"
     port_env = os.environ.get("DOBRIKA_PORT")
     port = _pick_free_port(int(port_env)) if port_env else _pick_free_port(8088)
+    if not run_server:
+        port = 8088
 
     base_url = f"http://{addr}:{port}"
 
     if not run_server:
         # Assume server is already running at provided URL
-        return base_url
+        yield base_url
+        return
 
     binary = os.environ.get("DOBRIKA_BINARY")
     if not binary:
@@ -98,6 +135,7 @@ def server_url(tmp_path_factory: pytest.TempPathFactory) -> str:
     env.setdefault("DOBRIKA_SEARCH_OFFSET", "0")
     env.setdefault("DOBRIKA_SEARCH_LIMIT", "20")
     env.setdefault("DOBRIKA_GEO_INDEX", "9")
+    env.setdefault("DOBRIKA_LOG_REQUESTS", "0")
 
     proc = subprocess.Popen(
         [str(binary_path)],
@@ -108,15 +146,21 @@ def server_url(tmp_path_factory: pytest.TempPathFactory) -> str:
         cwd=str(binary_path.parent),
         start_new_session=True,  # allow killing the whole process group
     )
+    stdout_buf, stderr_buf = _forward_process_output(proc)
 
     try:
         _wait_for_health(base_url, timeout_s=20.0)
     except Exception:
         # Dump some logs to help debugging before killing
         try:
-            if proc.stderr:
-                err = proc.stderr.read()
-                print("Dobrika server stderr:\n", err)
+            if stderr_buf:
+                print("Dobrika server stderr (tail):", file=sys.stderr)
+                for line in stderr_buf:
+                    print(line, file=sys.stderr)
+            if stdout_buf:
+                print("Dobrika server stdout (tail):")
+                for line in stdout_buf:
+                    print(line)
         finally:
             os.killpg(proc.pid, signal.SIGTERM)
             proc.wait(timeout=5)
